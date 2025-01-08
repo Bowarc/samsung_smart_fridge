@@ -1,4 +1,4 @@
-use serenity::all::{Context, EventHandler, Guild, Message, Ready};
+use serenity::all::{ChannelId, Context, EventHandler, Guild, GuildId, Message, MessageId, Ready, TypingStartEvent};
 
 pub struct Logger;
 
@@ -29,7 +29,7 @@ impl EventHandler for Logger {
                 break 'guild_name String::from("Unnamed guild");
             };
 
-            let Ok(guild) = Guild::get(ctx.http, id).await else{
+            let Ok(guild) = Guild::get(&ctx.http, id).await else {
                 break 'guild_name String::from("Unnamed guild");
             };
 
@@ -39,6 +39,30 @@ impl EventHandler for Logger {
         debug!(
             "{} sent '{}' in {guild_name}",
             message.author.name, message.content
+        );
+    }
+
+    async fn message_delete(
+        &self,
+        ctx: Context,
+        channel_id: ChannelId,
+        deleted_message_id: MessageId,
+        guild_id: Option<GuildId>,
+    ) {
+        let guild_name = 'guild_name: {
+            let Some(id) = guild_id else {
+                break 'guild_name String::from("Unnamed guild");
+            };
+
+            let Ok(guild) = Guild::get(&ctx.http, id).await else {
+                break 'guild_name String::from("Unnamed guild");
+            };
+
+            guild.name
+        };
+
+        debug!(
+            "{deleted_message_id} deleted in {guild_name}",
         );
     }
 }

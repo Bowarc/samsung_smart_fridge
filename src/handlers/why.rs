@@ -5,7 +5,7 @@ pub struct Why;
 #[serenity::async_trait]
 impl EventHandler for Why {
     async fn message(&self, ctx: Context, message: Message) {
-        if !message.content.to_lowercase().starts_with("why") {
+        if !super::is_command(&message, "why", super::Case::Insensitive){
             return;
         }
         

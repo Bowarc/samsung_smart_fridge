@@ -8,5 +8,6 @@ dotenv = "0.15.0"
 serenity = { version = "0.12.4", features = ["model"] }
 tokio = { version = "1.42.0", features = ["full"] }
 logger = { git = "https://github.com/bowarc/crates", package = "logger" }
+random = { git = "https://github.com/bowarc/crates", package = "random" }
 log = "0.4.20"
 futures = "0.3.31"

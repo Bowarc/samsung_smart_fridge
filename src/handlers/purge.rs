@@ -5,7 +5,7 @@ pub struct Purge;
 #[serenity::async_trait]
 impl EventHandler for Purge {
     async fn message(&self, ctx: Context, message: Message) {
-        if !message.content.to_lowercase().starts_with("purge") {
+        if !super::is_command(&message, "purge", super::Case::Insensitive) {
             return;
         }
 
@@ -14,28 +14,28 @@ impl EventHandler for Purge {
 
             if split.len() < 2 {
                 if let Err(why) = message
-                    .channel_id
-                    .say(
+                    .reply(
                         &ctx.http,
                         "Expected 1 argument, please specify a number of message to purge",
                     )
                     .await
                 {
                     error!("Could not send error message due to: {why}");
+                    return;
                 }
                 return;
             }
 
             let Ok(nbr) = split.get(1).unwrap().parse::<u8>() else {
                 if let Err(why) = message
-                    .channel_id
-                    .say(
+                    .reply(
                         &ctx.http,
                         "Could not parse count argument, make sure it's a positive integer",
                     )
                     .await
                 {
                     error!("Could not send error message due to: {why}");
+                    return;
                 }
                 return;
             };
@@ -52,8 +52,7 @@ impl EventHandler for Purge {
 
         let Channel::Guild(guild_channel) = channel else {
             if let Err(why) = message
-                .channel_id
-                .say(&ctx.http, "Private channels are not supported yet")
+                .reply(&ctx.http, "Private channels are not supported yet")
                 .await
             {
                 error!("Could not send error message due to: {why}");
@@ -69,8 +68,7 @@ impl EventHandler for Purge {
             .await
         else {
             if let Err(why) = message
-                .channel_id
-                .say(
+                .reply(
                     &ctx.http,
                     "Failed to fetch the recent messages for this channel",
                 )
@@ -102,6 +100,22 @@ impl EventHandler for Purge {
             return;
         }
 
-        trace!("Purged {count} messages");
+        let confirmation_message = match message
+            .channel_id
+            .say(&ctx.http, format!("Purged {count} messages"))
+            .await
+        {
+            Ok(msg) => msg,
+            Err(why) => {
+                error!("Failed to send confirmation message due to: {why}");
+                return;
+            }
+        };
+
+        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+
+        if let Err(why) = confirmation_message.delete(&ctx.http).await {
+            error!("Failed to delete confimation message due to: {why}");
+        }
     }
 }
