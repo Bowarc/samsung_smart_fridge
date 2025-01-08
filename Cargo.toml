@@ -1,0 +1,12 @@
+[package]
+name = "samsung_smart_fridge"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+dotenv = "0.15.0"
+serenity = { version = "0.12.4", features = ["model"] }
+tokio = { version = "1.42.0", features = ["full"] }
+logger = { git = "https://github.com/bowarc/crates", package = "logger" }
+log = "0.4.20"
+futures = "0.3.31"
