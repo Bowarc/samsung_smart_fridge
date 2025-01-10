@@ -1,6 +1,9 @@
+#![feature(yeet_expr)]
+
 #[macro_use]
 extern crate log;
 
+mod error;
 mod handlers;
 
 #[tokio::main]
@@ -9,18 +12,33 @@ async fn main() {
     use std::env;
     dotenv::dotenv().ok();
 
-    let logger_config = logger::LoggerConfig::new()
-        .set_level(log::LevelFilter::Off) // Serenity is weird
-        .add_filter("serenity", log::LevelFilter::Error)
-        .add_filter("samsung_smart_fridge", log::LevelFilter::Trace);
+    let filters = vec![
+        ("serenity", log::LevelFilter::Warn),
+        ("h2", log::LevelFilter::Error),
+        ("tokio", log::LevelFilter::Warn),
+        ("hyper", log::LevelFilter::Warn),
+        ("tungstenite", log::LevelFilter::Warn),
+        ("reqwest", log::LevelFilter::Warn),
+        ("rustls", log::LevelFilter::Warn),
+    ];
 
-    logger::init(logger_config, None);
+    logger::init([
+        logger::Config::default()
+            .level(log::LevelFilter::Trace)
+            .output(logger::Output::Stdout)
+            .colored(true)
+            .filters(&filters),
+        logger::Config::default()
+            .level(log::LevelFilter::Info)
+            .output("ssf.log")
+            .colored(false)
+            .filters(&filters),
+    ]);
 
     // Login with a bot token from the environment
     let token = env::var("DISCORD_TOKEN").expect("Expected a token in the environment");
     // Set gateway intents, which decides what events the bot will be notified about
-    let intents = GatewayIntents::GUILD_MESSAGES
-        | GatewayIntents::MESSAGE_CONTENT;
+    let intents = GatewayIntents::GUILD_MESSAGES | GatewayIntents::MESSAGE_CONTENT;
 
     // Create a new instance of the Client, logging in as a bot.
     let mut client = Client::builder(&token, intents)

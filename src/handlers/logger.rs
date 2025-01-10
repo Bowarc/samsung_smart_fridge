@@ -1,4 +1,4 @@
-use serenity::all::{ChannelId, Context, EventHandler, Guild, GuildId, Message, MessageId, Ready, TypingStartEvent};
+use serenity::all::{ChannelId, Context, EventHandler, Guild, GuildId, Message, MessageId, Ready};
 
 pub struct Logger;
 
@@ -45,7 +45,7 @@ impl EventHandler for Logger {
     async fn message_delete(
         &self,
         ctx: Context,
-        channel_id: ChannelId,
+        _channel_id: ChannelId,
         deleted_message_id: MessageId,
         guild_id: Option<GuildId>,
     ) {
