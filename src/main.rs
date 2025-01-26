@@ -1,10 +1,12 @@
 #![feature(yeet_expr)]
+#![feature(duration_constructors)]
 
 #[macro_use]
 extern crate log;
 
 mod error;
 mod handlers;
+mod command;
 
 #[tokio::main]
 async fn main() {
@@ -30,7 +32,10 @@ async fn main() {
             .filters(&filters),
         logger::Config::default()
             .level(log::LevelFilter::Info)
-            .output("ssf.log")
+            .output(logger::Output::new_timed_file(
+                "./log/.log",
+                std::time::Duration::from_hours(1),
+            ))
             .colored(false)
             .filters(&filters),
     ]);

@@ -7,6 +7,8 @@ pub enum GameTurn {
 }
 
 pub struct TicTacToeGame {
+    game_id: uuid::Uuid,
+    
     player1_id: UserId,
     player2_id: UserId,
 
@@ -25,9 +27,11 @@ enum CellState {
     P2,
 }
 
+
 impl TicTacToeGame {
     pub fn new(player1_id: UserId, player2_id: UserId, owner: UserId) -> Self {
         Self {
+            game_id: uuid::Uuid::new_v4(),
             player1_id,
             player2_id,
             owner,

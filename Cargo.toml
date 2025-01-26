@@ -12,3 +12,4 @@ random = { git = "https://github.com/bowarc/crates", package = "random" }
 log = "0.4.20"
 futures = "0.3.31"
 thiserror = "2.0.10"
+uuid = { version = "1.12.1", features = ["v4"] }
