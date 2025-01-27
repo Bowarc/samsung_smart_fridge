@@ -8,7 +8,7 @@ pub struct Purge;
 #[serenity::async_trait]
 impl EventHandler for Purge {
     async fn message(&self, ctx: Context, message: Message) {
-        let Some(bits) = command::parse(
+        let Some(args) = command::parse(
             &message,
             "purge",
             command::Case::Insensitive,
@@ -17,7 +17,7 @@ impl EventHandler for Purge {
             return;
         };
 
-        if bits.len() != 2 {
+        if args.len() != 1 {
             if let Err(why) = message
                 .reply(
                     &ctx.http,
@@ -30,12 +30,12 @@ impl EventHandler for Purge {
             return;
         }
 
-        // This unwrap is fine as we just checked the len of the bits
-        let Ok(count) = bits.get(1).unwrap().parse::<u8>() else {
+        // This unwrap is fine as we just checked the len of the args
+        let Ok(count) = args.first().unwrap().parse::<u8>() else {
             if let Err(why) = message
                 .reply(
                     &ctx.http,
-                    "Could not parse count argument, make sure it's a positive integer",
+                    "Could not parse count argument, make sure it's a positive integer and less than 100",
                 )
                 .await
             {
@@ -113,10 +113,12 @@ impl EventHandler for Purge {
             }
         };
 
-        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+        tokio::task::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
 
-        if let Err(why) = confirmation_message.delete(&ctx.http).await {
-            error!("Failed to delete confimation message due to: {why}");
-        }
+            if let Err(why) = confirmation_message.delete(&ctx.http).await {
+                error!("Failed to delete confimation message due to: {why}");
+            }
+        });
     }
 }

@@ -1,17 +1,17 @@
+mod cell;
 mod data;
 mod error;
 mod game;
 mod id;
 mod position;
+mod turn;
 
 use crate::command;
 use data::TicTacToeData;
 pub use error::TicTacToeError;
 
-use serenity::all::{
-    Context, CreateActionRow, CreateButton, CreateInteractionResponseMessage, CreateMessage,
-    EventHandler, Interaction, Message, Ready,
-};
+use id::GridButtonId;
+use serenity::all::{Context, EventHandler, Interaction, Message, Ready};
 
 pub struct TicTacToe;
 
@@ -29,7 +29,7 @@ impl EventHandler for TicTacToe {
     }
     async fn message(&self, ctx: Context, message: Message) {
         'join: {
-            let Some(bits) = command::parse(
+            let Some(args) = command::parse(
                 &message,
                 "Tplay",
                 command::Case::Sensitive,
@@ -38,13 +38,13 @@ impl EventHandler for TicTacToe {
                 break 'join;
             };
 
-            if bits.len() > 2 {
+            if args.len() != 1 {
                 if let Err(why) = message
                     .reply(
                         &ctx,
                         format!(
                             "Tplay command received, but got unexpected arguments: {:?}",
-                            &bits[1..]
+                            &args[1..]
                         ),
                     )
                     .await
@@ -60,7 +60,7 @@ impl EventHandler for TicTacToe {
         };
 
         'help: {
-            let Some(bits) = command::parse(
+            let Some(args) = command::parse(
                 &message,
                 "Thelp",
                 command::Case::Sensitive,
@@ -69,10 +69,10 @@ impl EventHandler for TicTacToe {
                 break 'help;
             };
 
-            if bits.len() > 1 {
+            if args.len() > 1 {
                 error!(
                     "Thelp command received, but got unexpected arguments: {:?}",
-                    &bits[1..]
+                    &args[1..]
                 );
                 break 'help;
             }
@@ -86,7 +86,7 @@ impl EventHandler for TicTacToe {
         };
 
         't: {
-            let Some(bits) = command::parse(
+            let Some(_args) = command::parse(
                 &message,
                 "T",
                 command::Case::Sensitive,
@@ -94,72 +94,48 @@ impl EventHandler for TicTacToe {
             ) else {
                 break 't;
             };
-
-            message
-                .channel_id
-                .send_message(
-                    &ctx,
-                    CreateMessage::new().components(vec![
-                        CreateActionRow::Buttons(vec![
-                            CreateButton::new(format!("00")).label(format!("00")),
-                            CreateButton::new(format!("01")).label(format!("01")),
-                            CreateButton::new(format!("02")).label(format!("02")),
-                        ]),
-                        CreateActionRow::Buttons(vec![
-                            CreateButton::new(format!("10")).label(format!("10")),
-                            CreateButton::new(format!("11")).label(format!("11")),
-                            CreateButton::new(format!("12")).label(format!("12")),
-                        ]),
-                        CreateActionRow::Buttons(vec![
-                            CreateButton::new(format!("20")).label(format!("20")),
-                            CreateButton::new(format!("21")).label(format!("21")),
-                            CreateButton::new(format!("22")).label(format!("22")),
-                        ]),
-                    ]),
-                )
-                .await
-                .unwrap();
         }
     }
 
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
-        let Interaction::Component(c) = interaction else {
-            panic!()
+        let Some(data) = ctx.data.read().await.get::<TicTacToeData>().cloned() else {
+            error!("Could not get TicTacToe data from storage");
+            return;
         };
 
+        let Interaction::Component(c) = interaction else {
+            warn!("Ignored interaction: {interaction:?}");
+            return;
+        };
 
-        // Needed to make sure the user's client doesn't display a small error message
         c.create_response(&ctx, serenity::all::CreateInteractionResponse::Acknowledge)
             .await
             .unwrap();
 
-        debug!("Acknowledged {}", c.data.custom_id);
+        let Ok(button_id) = GridButtonId::try_from(&c.data.custom_id) else {
+            panic!(
+                "Failed to convert custom id to a grid button id: '{}'",
+                c.data.custom_id
+            )
+        };
 
-        c.create_response(
-            &ctx,
-            serenity::all::CreateInteractionResponse::UpdateMessage(
-                CreateInteractionResponseMessage::new().components(vec![
-                    CreateActionRow::Buttons(vec![
-                        CreateButton::new(format!("00")).label(format!("00")),
-                        CreateButton::new(format!("01")).label(format!("01")),
-                        CreateButton::new(format!("02")).label(format!("02")),
-                    ]),
-                    CreateActionRow::Buttons(vec![
-                        CreateButton::new(format!("10")).label(format!("10")),
-                        CreateButton::new(format!("11")).label(format!("11")),
-                        CreateButton::new(format!("12")).label(format!("12")),
-                    ]),
-                    CreateActionRow::Buttons(vec![
-                        CreateButton::new(format!("20")).label(format!("20")),
-                        CreateButton::new(format!("21")).label(format!("21")),
-                        CreateButton::new(format!("22")).label(format!("22")),
-                    ]),
-                ]),
-            ),
-        )
-        .await
-        .unwrap();
+        let mut data_writer = data.write().await;
 
+        let Some(game) = data_writer
+            .games
+            .iter_mut()
+            .find(|g| g.players().contains(&&c.user.id))
+        else {
+            return;
+        };
+
+        if let Err(e) = game.play(&ctx, c.user.id, button_id.cell_position()).await{
+            error!("{e}");
+        };
+
+        // Needed to make sure the user's client doesn't display a small error message
+
+        // debug!("Acknowledged {}", c.data.custom_id);
     }
 }
 
@@ -212,7 +188,13 @@ async fn join(ctx: &Context, message: &Message) -> Result<(), crate::error::Erro
         )
         .await?;
 
-    let game = game::TicTacToeGame::new(message.author.id, player2.id, message.author.id);
+    let game =
+        match game::Game::init_new(ctx, message.channel_id, message.author.id, player2.id).await {
+            Ok(game) => game,
+            Err(e) => {
+                panic!("{e}")
+            }
+        };
 
     {
         data.write().await.games.push(game);

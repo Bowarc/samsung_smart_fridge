@@ -8,14 +8,14 @@ pub struct Ping;
 #[serenity::async_trait]
 impl EventHandler for Ping {
     async fn message(&self, ctx: Context, message: Message) {
-        let Some(bits) = command::parse(&message, "ping", command::Case::Insensitive, command::Prefix::Yes) else {
+        let Some(args) = command::parse(&message, "ping", command::Case::Insensitive, command::Prefix::Yes) else {
             return;
         };
 
-        if bits.len() > 1 {
+        if !args.is_empty() {
             error!(
                 "Thelp command received, but got unexpected arguments: {:?}",
-                &bits[1..]
+                &args
             );
             return;
         }

@@ -8,7 +8,7 @@ pub struct Why;
 #[serenity::async_trait]
 impl EventHandler for Why {
     async fn message(&self, ctx: Context, message: Message) {
-        let Some(_bits) = command::parse(
+        let Some(_args) = command::parse(
             &message,
             "why",
             command::Case::Insensitive,

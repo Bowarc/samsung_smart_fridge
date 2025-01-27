@@ -13,6 +13,7 @@ pub enum Prefix {
     No,
 }
 
+/// Parsed the message content as a command, returning the args if the requested command was found
 pub fn parse<'a>(
     message: &'a serenity::all::Message,
     base_command: &str,
@@ -24,16 +25,10 @@ pub fn parse<'a>(
         Prefix::No => EMPTY_STR,
     };
 
-    let splitted = message.content.split(' ').collect::<Vec<&str>>();
+    let mut cmd = message.content.split_whitespace();
 
-    if splitted.is_empty() {
-        // How ?
-        return None;
-    }
+    let first = cmd.next()?;
 
-    // Unwrap is fine, we checked above if the vec is empty
-    let first = splitted.first().unwrap();
-    
     if !first.starts_with(prefix) {
         // No prefix, no command
         return None;
@@ -41,7 +36,7 @@ pub fn parse<'a>(
 
     match case {
         Case::Sensitive => {
-            if first != &format!("{prefix}{base_command}") {
+            if first != format!("{prefix}{base_command}") {
                 return None;
             }
         }
@@ -52,7 +47,7 @@ pub fn parse<'a>(
         }
     }
 
-    Some(splitted)
+    Some(cmd.collect())
 }
 
 // pub fn is_command(message: &serenity::all::Message, command: &str, case: Case) -> bool {
