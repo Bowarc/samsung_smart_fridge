@@ -18,7 +18,7 @@ pub struct CellPos {
 
 impl CellPos {
     pub fn new(x: CellX, y: CellY) -> Self {
-        Self { x, y }
+        Self { x: x.into(), y: y.into() }
     }
     pub fn x(&self) -> &CellX {
         &self.x

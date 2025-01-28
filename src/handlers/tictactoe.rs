@@ -10,8 +10,12 @@ use crate::command;
 use data::TicTacToeData;
 pub use error::TicTacToeError;
 
+use game::GameState;
 use id::GridButtonId;
-use serenity::all::{Context, EventHandler, Interaction, Message, Ready};
+use serenity::all::{
+    Context, CreateInteractionResponseMessage, EventHandler, Interaction, Message, Ready,
+};
+use turn::GameTurn;
 
 pub struct TicTacToe;
 
@@ -108,11 +112,21 @@ impl EventHandler for TicTacToe {
             return;
         };
 
-        c.create_response(&ctx, serenity::all::CreateInteractionResponse::Acknowledge)
-            .await
-            .unwrap();
+        debug!("Button interaction: {:?}", c.data.kind);
+
+        // Needed to make sure the user's client doesn't display a small error message
 
         let Ok(button_id) = GridButtonId::try_from(&c.data.custom_id) else {
+            if let Err(e) = c
+                .create_response(&ctx, serenity::all::CreateInteractionResponse::Acknowledge)
+                .await
+            {
+                error!(
+                    "Failed to acknoledge component interaction {} due to: {e}",
+                    c.id
+                )
+            }
+
             panic!(
                 "Failed to convert custom id to a grid button id: '{}'",
                 c.data.custom_id
@@ -126,16 +140,68 @@ impl EventHandler for TicTacToe {
             .iter_mut()
             .find(|g| g.players().contains(&&c.user.id))
         else {
+            if let Err(e) = c
+                .create_response(&ctx, serenity::all::CreateInteractionResponse::Acknowledge)
+                .await
+            {
+                error!(
+                    "Failed to acknoledge component interaction {} due to: {e}",
+                    c.id
+                )
+            }
             return;
         };
 
-        if let Err(e) = game.play(&ctx, c.user.id, button_id.cell_position()).await{
+        if game.current_player_id() != c.user.id {
+            warn!(
+                "Player {} tried to play, but it wasn't their turn, gameid: {}",
+                ctx.http
+                    .get_user(c.user.id)
+                    .await
+                    .map(|user| user.global_name.clone().unwrap_or(user.name))
+                    .unwrap_or(format!(
+                        "Player {}",
+                        match game.turn() {
+                            GameTurn::Player1 => 2,
+                            GameTurn::Player2 => 1,
+                        }
+                    )),
+                game.id()
+            );
+            if let Err(e) = c
+                .create_response(
+                    ctx,
+                    serenity::all::CreateInteractionResponse::Message(
+                        CreateInteractionResponseMessage::new()
+                            .ephemeral(true)
+                            .content("Wait your turn"),
+                    ),
+                )
+                .await
+            {
+                error!("Failed to send component inreraction message due to: {e}");
+            }
+            return;
+        }
+
+        if let Err(e) = game.play(&ctx, c.user.id, button_id.cell_position()).await {
             error!("{e}");
         };
 
-        // Needed to make sure the user's client doesn't display a small error message
+        if let Err(e) = c
+            .create_response(&ctx, serenity::all::CreateInteractionResponse::Acknowledge)
+            .await
+        {
+            error!(
+                "Failed to acknoledge component interaction {} due to: {e}",
+                c.id
+            )
+        }
 
-        // debug!("Acknowledged {}", c.data.custom_id);
+        // Remove all games that are done
+        data_writer
+            .games
+            .retain(|game| matches!(game.state(), GameState::Running));
     }
 }
 
@@ -174,12 +240,13 @@ async fn join(ctx: &Context, message: &Message) -> Result<(), crate::error::Erro
     // The unwrap is fine, as we checked the len right above
     let player2 = message.mentions.first().unwrap();
 
-    if player2.id == message.author.id {
-        message
-            .reply(&ctx.http, "You cannot play vs yourself")
-            .await?;
-        do yeet TicTacToeError::CantPlayVsYourself;
-    }
+    // TODO: Disabled for testing purpose, please don't leave this commented
+    // if player2.id == message.author.id {
+    //     message
+    //         .reply(&ctx.http, "You cannot play vs yourself")
+    //         .await?;
+    //     do yeet TicTacToeError::CantPlayVsYourself;
+    // }
 
     message
         .reply(

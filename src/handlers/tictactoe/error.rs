@@ -14,4 +14,7 @@ pub enum TicTacToeError{
     
     #[error("Not your turn")]
     NotYourTurn,
+
+    #[error("The game ended")]
+    GameEnded,
 }

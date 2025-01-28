@@ -1,4 +1,4 @@
-#[derive(Default, Debug, Copy, Clone)]
+#[derive(Default, Debug, Copy, Clone, PartialEq, Eq)]
 pub enum State {
     #[default]
     Empty,
@@ -6,20 +6,10 @@ pub enum State {
     P2,
 }
 
-impl State {
-    fn emoji(&self) -> &str {
-        match self {
-            State::Empty => ":white_large_square:",
-            State::P1 => ":regional_indicator_x:",
-            State::P2 => ":o2:",
-        }
-    }
-}
-
 impl From<&State> for String {
     fn from(state: &State) -> String {
         match state {
-            State::Empty => String::from("."),
+            State::Empty => String::from(crate::INVISIBLE_CHARACTER),
             State::P1 => String::from("X"),
             State::P2 => String::from("O"),
         }

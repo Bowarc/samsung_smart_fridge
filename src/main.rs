@@ -8,6 +8,9 @@ mod error;
 mod handlers;
 mod command;
 
+const INVISIBLE_CHARACTER: &str = "\u{200e}";
+// const INVISIBLE_CHARACTER: &str = "\u{18b5}";
+
 #[tokio::main]
 async fn main() {
     use serenity::prelude::*;
