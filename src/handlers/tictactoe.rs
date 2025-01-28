@@ -226,7 +226,7 @@ async fn join(ctx: &Context, message: &Message) -> Result<(), crate::error::Erro
             .await?;
         do yeet TicTacToeError::PlayerAlreadyInAGame;
     }
-
+    
     if message.mentions.len() != 1 {
         message
             .reply(
@@ -241,12 +241,12 @@ async fn join(ctx: &Context, message: &Message) -> Result<(), crate::error::Erro
     let player2 = message.mentions.first().unwrap();
 
     // TODO: Disabled for testing purpose, please don't leave this commented
-    // if player2.id == message.author.id {
-    //     message
-    //         .reply(&ctx.http, "You cannot play vs yourself")
-    //         .await?;
-    //     do yeet TicTacToeError::CantPlayVsYourself;
-    // }
+    if player2.id == message.author.id {
+        message
+            .reply(&ctx.http, "You cannot play vs yourself")
+            .await?;
+        do yeet TicTacToeError::CantPlayVsYourself;
+    }
 
     message
         .reply(
@@ -256,7 +256,7 @@ async fn join(ctx: &Context, message: &Message) -> Result<(), crate::error::Erro
         .await?;
 
     let game =
-        match game::Game::init_new(ctx, message.channel_id, message.author.id, player2.id).await {
+        match game::Game::init_new(ctx, message, message.author.id, player2.id).await {
             Ok(game) => game,
             Err(e) => {
                 panic!("{e}")

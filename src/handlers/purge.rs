@@ -103,7 +103,7 @@ impl EventHandler for Purge {
 
         let confirmation_message = match message
             .channel_id
-            .say(&ctx.http, format!("Purged {count} messages"))
+            .say(&ctx.http, format!("Deleted {count} messages"))
             .await
         {
             Ok(msg) => msg,

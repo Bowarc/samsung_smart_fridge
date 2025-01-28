@@ -39,30 +39,21 @@ pub struct Game {
     board: [[cell::State; 3]; 3],
 
     board_message: Message,
-    win_message: Message,
 }
 
 impl Game {
     pub async fn init_new(
         cache_http: &impl CacheHttp,
-        channel_id: ChannelId,
+        request_message: &Message,
         player1_id: UserId,
         player2_id: UserId,
     ) -> Result<Self, Error> {
         let game_id = uid::IdU16::new();
         let owner = player1_id; // Technically not usefull as we could use player1, but explicit is better
 
-        let board_message = channel_id
-            .send_message(
-                cache_http,
-                CreateMessage::new().content(format!("Generating TicTacToe game. . .\nGameId: {game_id}\nPlayers: {player1_id} - {player2_id}\nOwner: {owner}")),
-            )
-            .await?;
-
-        let win_message = channel_id
-            .send_message(
-                cache_http,
-                CreateMessage::new().content(crate::INVISIBLE_CHARACTER),
+        let board_message = request_message.reply(
+            cache_http,
+            format!("Generating TicTacToe game. . .\nGameId: {game_id}\nPlayers: {player1_id} - {player2_id}\nOwner: {owner}")
             )
             .await?;
 
@@ -82,7 +73,6 @@ impl Game {
 
             board: Default::default(),
             board_message,
-            win_message,
         };
 
         game.render(cache_http).await;
@@ -243,26 +233,6 @@ impl Game {
                 ))
         };
 
-        match self.state {
-            GameState::Running => {}
-            GameState::Tie => {
-                self.win_message
-                    .edit(cache_http, EditMessage::new().content("Tie !"))
-                    .await
-                    .unwrap();
-            }
-            GameState::Won(winner_id) => {
-                self.win_message
-                    .edit(
-                        cache_http,
-                        EditMessage::new()
-                            .content(format!("{} won!", player_name(winner_id).await)),
-                    )
-                    .await
-                    .unwrap();
-            }
-        }
-
         let win_cells = self.check_win().unwrap_or_default();
 
         let mut components = Vec::with_capacity(3);
@@ -295,27 +265,46 @@ impl Game {
             components.push(CreateActionRow::Buttons(action_row));
         }
 
+        let global_message_content: String;
+
+        match self.state {
+            GameState::Running => {
+                let mark_current = |id: UserId, name: String| -> String {
+                    if self.current_player_id() == id {
+                        format!("**__{name}__**")
+                    } else {
+                        name
+                    }
+                };
+                let p1 = mark_current(self.player1_id, player_name(self.player1_id).await);
+                let p2 = mark_current(self.player2_id, player_name(self.player2_id).await);
+
+                global_message_content = format!("{p1} vs {p2}");
+            }
+            GameState::Tie => {
+                global_message_content = format!(
+                    "{} tied vs {}",
+                    player_name(self.player1_id).await,
+                    player_name(self.player2_id).await
+                );
+            }
+            GameState::Won(winner_id) => {
+                let winner = player_name(winner_id).await;
+                let loser = player_name(match self.turn {
+                    GameTurn::Player1 => self.player1_id,
+                    GameTurn::Player2 => self.player2_id,
+                })
+                .await;
+                global_message_content = format!("{winner} won vs {loser}");
+            }
+        }
+
         self.board_message
             .edit(
                 cache_http,
-                EditMessage::new().components(components).content({
-                    let get_label = async |user: UserId| -> String {
-                        let base = player_name(user).await;
-
-                        // There is an issue here, when the player plays vs themself, both player names are highlighted
-                        // Not important, but still note worthy
-                        if self.current_player_id() == user {
-                            format!("({base})")
-                        } else {
-                            base
-                        }
-                    };
-
-                    let p1_label = get_label(self.player1_id).await;
-                    let p2_label = get_label(self.player2_id).await;
-
-                    format!("{p1_label} - {p2_label}")
-                }),
+                EditMessage::new()
+                    .components(components)
+                    .content(global_message_content),
             )
             .await
             .unwrap();

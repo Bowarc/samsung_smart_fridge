@@ -1,3 +1,5 @@
+use serenity::all::{CreateAttachment, CreateMessage};
+
 use {
     crate::command,
     serenity::all::{Context, EventHandler, Message},
@@ -17,7 +19,13 @@ impl EventHandler for Why {
             return;
         };
 
-        if let Err(why) = message.reply(&ctx.http, "Because fuck you").await {
+        if let Err(why) = message
+            .reply(
+                &ctx.http,
+                "Because fuck you <:pepospit:1333841848581619722>",
+            )
+            .await
+        {
             println!("Failed to respond to ping message due to: {why}");
         }
     }
